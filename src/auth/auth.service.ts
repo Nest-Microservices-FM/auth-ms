@@ -1,18 +1,48 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { RpcException } from '@nestjs/microservices';
+import { RpcException, Payload } from '@nestjs/microservices';
 import { PrismaClient } from '@prisma/client';
 import { RegisterUserDto } from './dto/register-user.dto';
 import * as bcrypt from 'bcrypt';
 import { LoginUserDto } from './dto/login-user.dto';
+import { JwtService } from '@nestjs/jwt';
+import { JwtPayload } from './dto/interfaces/jwt-payload.interface';
+import { envs } from 'src/config';
 @Injectable()
 export class AuthService extends PrismaClient implements OnModuleInit{
 
   private readonly logger = new Logger('AuthService')
-
+  constructor(
+    private jwtService: JwtService
+  ){
+    super();
+  }
 
   onModuleInit(){
     this.$connect();
     this.logger.log('MongoDB connected')
+  }
+
+  async singJWT(payload: JwtPayload){
+    return this.jwtService.sign(payload)
+  }
+
+
+  async verifyToken(token:string){
+    try {
+      const {sub, iat, exp, ...user} = this.jwtService.verify(token, {
+        secret: envs.jwtSecret,
+      })
+      
+      return {
+        user: user,
+        token: await this.singJWT(user),
+      }
+    } catch (error) {
+      throw new RpcException({
+        status: 401,
+        message: 'Invalid Token'
+      })
+    }
   }
 
 
@@ -44,7 +74,7 @@ export class AuthService extends PrismaClient implements OnModuleInit{
     const { password: __, ...rest } = newUser
     return {
       user: rest, 
-      token: 'ABC'
+      token: await this.singJWT(rest)
     }
     } catch (error) {
       throw new RpcException({
@@ -54,6 +84,7 @@ export class AuthService extends PrismaClient implements OnModuleInit{
     }
   }
 
+
   async loginUser(loginUserDto:LoginUserDto){
     try {
       const {email, password} = loginUserDto;
@@ -61,7 +92,6 @@ export class AuthService extends PrismaClient implements OnModuleInit{
       const user = await this.user.findUnique({
         where:{
           email: email,
-
         }
       });
 
@@ -83,7 +113,7 @@ export class AuthService extends PrismaClient implements OnModuleInit{
       const { password: __, ...rest } = user;
       return {
         user: rest, 
-        token: 'ABC'
+        token: await this.singJWT(rest)
       }
     } catch (error) {
       throw new RpcException({
