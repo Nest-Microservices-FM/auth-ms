@@ -1,4 +1,7 @@
-import { IsEmail, IsString, IsStrongPassword } from "class-validator";
+import { IsEmail, IsEnum, IsString, IsStrongPassword } from "class-validator";
+import { RoleUserList } from "./enum/role.enum";
+import { Role } from "@prisma/client";
+
 
 export class RegisterUserDto {
   
@@ -13,5 +16,8 @@ export class RegisterUserDto {
   @IsStrongPassword()
   password: string;
 
-
+  @IsEnum(RoleUserList, {
+    message: `Valid role are ${ RoleUserList}`
+  })
+  role: Role;
 }
